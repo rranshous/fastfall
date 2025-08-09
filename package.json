@@ -1,0 +1,21 @@
+{
+  "name": "fastfall",
+  "version": "1.0.0",
+  "description": "Fast-paced falling obstacle game",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "serve": "http-server dist -p 3000 -o"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.5.0",
+    "http-server": "^14.1.1",
+    "typescript": "^5.1.6"
+  }
+}
