@@ -8,7 +8,7 @@ class FastFallGame {
         this.PLATFORM_SPACING = 200;
         this.FOV = 500; // Field of view for 3D projection
         this.WIND_CHANGE_RATE = 0.002;
-        this.VERSION = "v1.2.1-ws-projection-fix"; // Version identifier
+        this.VERSION = "v1.3.0-coordinate-system-rework"; // Version identifier
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         // Make canvas full screen
@@ -78,7 +78,7 @@ class FastFallGame {
         // Generate platforms in 3D space that player must navigate around
         this.platforms = [];
         for (let i = 0; i < 500; i++) {
-            const z = i * this.PLATFORM_SPACING + 300; // Distance ahead of player
+            const z = i * this.PLATFORM_SPACING + 1000; // Start far away (high Z) and approach camera
             const complexity = Math.floor(i / 10) + 1; // Increase complexity over time
             // Different platform types based on distance fallen
             if (i < 5) {
@@ -183,7 +183,7 @@ class FastFallGame {
     updatePlatforms() {
         if (this.isGameOver || !this.gameStarted)
             return;
-        // Move platforms toward player (simulating falling)
+        // Move platforms toward camera (simulating falling)
         this.platforms.forEach(platform => {
             platform.z -= this.gameSpeed;
             // Update moving platforms
@@ -208,8 +208,8 @@ class FastFallGame {
                 platform.rotation += 0.01;
             }
         });
-        // Remove platforms that have passed behind the player
-        this.platforms = this.platforms.filter(platform => platform.z > -200);
+        // Remove platforms that have passed behind the camera
+        this.platforms = this.platforms.filter(platform => platform.z > 0);
         // Update game state
         this.altitude -= this.gameSpeed * 10; // Each unit of speed = 10 feet
         this.gameSpeed = Math.min(this.MAX_GAME_SPEED, this.INITIAL_GAME_SPEED + Math.floor((10000 - this.altitude) / 1000));
@@ -219,15 +219,15 @@ class FastFallGame {
         this.wind.strength = 3 + Math.sin(this.frameCount * 0.01) * 2;
     }
     updateParticles() {
-        // Add wind/speed particles
+        // Update particles for new coordinate system
         if (this.gameStarted && !this.isGameOver && Math.random() < 0.3) {
             this.particles.push({
                 x: (Math.random() - 0.5) * this.canvas.width,
                 y: (Math.random() - 0.5) * this.canvas.height,
-                z: 1000 + Math.random() * 500,
+                z: 2000 + Math.random() * 1000, // Start far away
                 vx: this.wind.x * 2,
                 vy: 0,
-                vz: -this.gameSpeed * 2,
+                vz: -this.gameSpeed * 2, // Move toward camera
                 life: 60,
                 maxLife: 60,
                 size: 1 + Math.random() * 3,
@@ -241,15 +241,16 @@ class FastFallGame {
             particle.z += particle.vz;
             particle.life--;
         });
-        // Remove dead particles
-        this.particles = this.particles.filter(particle => particle.life > 0 && particle.z > -100);
+        // Remove dead particles (also using new coordinate system)
+        this.particles = this.particles.filter(particle => particle.life > 0 && particle.z > 0);
     }
     checkCollisions() {
         if (this.isGameOver || !this.gameStarted)
             return;
         for (const platform of this.platforms) {
-            // Only check platforms that are close to the player
-            if (platform.z > -50 && platform.z < 50) {
+            // Camera is at z=0, check platforms that are very close to camera
+            // Collision happens when platforms are almost "at the screen"
+            if (platform.z > 5 && platform.z < 50) {
                 const distanceX = Math.abs(this.player.x - platform.x);
                 const distanceY = Math.abs(this.player.y - platform.y);
                 if (platform.type === 'ring') {
@@ -310,8 +311,13 @@ class FastFallGame {
         this.updateUI();
     }
     project3D(x, y, z) {
-        // Simple 3D to 2D projection
-        const scale = this.FOV / (this.FOV + z);
+        // Reworked 3D projection: camera at z=0, objects start far away (high z) and approach
+        // When z=0: object is at camera (infinitely large)
+        // When z=500: object is normal distance away (scale = 1)
+        // When z=1000: object is far away (scale = 0.5)
+        if (z <= 0)
+            return { x: 0, y: 0, scale: -1 }; // Behind camera, don't draw
+        const scale = this.FOV / z;
         return {
             x: this.canvas.width / 2 + ((x - this.player.x) + this.camera.shake * (Math.random() - 0.5)) * scale,
             y: this.canvas.height / 2 + ((y - this.player.y) + this.camera.shake * (Math.random() - 0.5)) * scale,
@@ -347,7 +353,7 @@ class FastFallGame {
         // Draw platforms in distance order (far to near)
         const sortedPlatforms = [...this.platforms].sort((a, b) => b.z - a.z);
         for (const platform of sortedPlatforms) {
-            if (platform.z > -100 && platform.z < 2000) {
+            if (platform.z > 0 && platform.z < 10000) {
                 this.drawPlatform(platform);
             }
         }
@@ -463,7 +469,7 @@ class FastFallGame {
         this.ctx.fillText(`Active Keys: ${activeKeys.join(', ')}`, 20, y);
         y += lineHeight;
         // Show nearby platforms
-        const nearbyPlatforms = this.platforms.filter(p => p.z > -50 && p.z < 200);
+        const nearbyPlatforms = this.platforms.filter(p => p.z > 0 && p.z < 1000);
         this.ctx.fillText(`Nearby Platforms: ${nearbyPlatforms.length}`, 20, y);
         y += lineHeight;
         // Draw player collision boundary in center of screen
