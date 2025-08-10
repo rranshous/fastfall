@@ -145,9 +145,7 @@ fastfall/
 
 ## 📤 Publishing to Itch.io
 
-FastFall is live on itch.io! **[Play it here →](https://codeflaw.itch.io/fastfall)**
-
-The game includes a dedicated build script for easy publishing and updates:
+FastFall is ready for itch.io publishing! Use the dedicated build script:
 
 ```bash
 npm run build:itch
@@ -167,6 +165,9 @@ This creates:
 7. Configure your game page and publish!
 
 The build includes itch.io optimizations for proper embedding and viewport handling.
+
+### 🎮 Live Game
+**[Play FastFall on itch.io →](https://codeflaw.itch.io/fastfall)**
 
 ## 📝 License
 
