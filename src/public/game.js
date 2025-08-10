@@ -8,6 +8,7 @@ class FastFallGame {
         this.PLATFORM_SPACING = 200;
         this.FOV = 500; // Field of view for 3D projection
         this.WIND_CHANGE_RATE = 0.002;
+        this.VERSION = "v1.2.1-ws-projection-fix"; // Version identifier
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         // Make canvas full screen
@@ -173,6 +174,11 @@ class FastFallGame {
         // Update camera shake based on speed
         this.camera.shake = this.gameSpeed * 0.5;
         this.camera.tilt = this.player.x * 0.001; // Tilt based on horizontal movement
+        // Add subtle vertical camera effect for better W/S feedback
+        // This doesn't change the actual view much but helps show movement
+        if (this.keys['w'] || this.keys['s']) {
+            this.camera.shake += 1; // Extra shake when moving vertically
+        }
     }
     updatePlatforms() {
         if (this.isGameOver || !this.gameStarted)
@@ -307,8 +313,8 @@ class FastFallGame {
         // Simple 3D to 2D projection
         const scale = this.FOV / (this.FOV + z);
         return {
-            x: this.canvas.width / 2 + (x + this.camera.shake * (Math.random() - 0.5)) * scale,
-            y: this.canvas.height / 2 + (y + this.camera.shake * (Math.random() - 0.5)) * scale,
+            x: this.canvas.width / 2 + ((x - this.player.x) + this.camera.shake * (Math.random() - 0.5)) * scale,
+            y: this.canvas.height / 2 + ((y - this.player.y) + this.camera.shake * (Math.random() - 0.5)) * scale,
             scale
         };
     }
@@ -419,16 +425,22 @@ class FastFallGame {
         // Reset any transforms for debug overlay
         this.ctx.save();
         this.ctx.resetTransform();
-        // Semi-transparent background for debug text
+        // Semi-transparent background for debug text - positioned at bottom left
+        const panelWidth = 350;
+        const panelHeight = 200;
+        const panelX = 10;
+        const panelY = this.canvas.height - panelHeight - 10; // Bottom left
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, 10, 350, 200);
+        this.ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
         // Debug text styling
         this.ctx.fillStyle = '#00ff00';
         this.ctx.font = '14px monospace';
         // Player position and debug info
-        let y = 30;
+        let y = panelY + 20; // Start 20px from top of panel
         const lineHeight = 16;
         this.ctx.fillText(`Debug Mode (F to toggle)`, 20, y);
+        y += lineHeight;
+        this.ctx.fillText(`Version: ${this.VERSION}`, 20, y);
         y += lineHeight;
         this.ctx.fillText(`Player X: ${this.player.x.toFixed(1)}`, 20, y);
         y += lineHeight;
@@ -446,6 +458,10 @@ class FastFallGame {
         y += lineHeight;
         this.ctx.fillText(`Platforms: ${this.platforms.length}`, 20, y);
         y += lineHeight;
+        // Show active keys for movement debugging
+        const activeKeys = Object.keys(this.keys).filter(key => this.keys[key]);
+        this.ctx.fillText(`Active Keys: ${activeKeys.join(', ')}`, 20, y);
+        y += lineHeight;
         // Show nearby platforms
         const nearbyPlatforms = this.platforms.filter(p => p.z > -50 && p.z < 200);
         this.ctx.fillText(`Nearby Platforms: ${nearbyPlatforms.length}`, 20, y);
@@ -462,41 +478,56 @@ class FastFallGame {
         // Draw collision zones for nearby platforms
         this.ctx.strokeStyle = '#ff0000';
         this.ctx.lineWidth = 1;
+        // Apply the same camera tilt as the main render for accurate alignment
+        this.ctx.save();
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.rotate(this.camera.tilt);
+        this.ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
         for (const platform of nearbyPlatforms) {
             const projected = this.project3D(platform.x, platform.y, platform.z);
+            // Save context for platform-specific transforms
+            this.ctx.save();
+            this.ctx.translate(projected.x, projected.y);
+            this.ctx.scale(projected.scale, projected.scale);
+            // Apply same rotation as the platform for accurate collision visualization
+            if (platform.rotation !== 0) {
+                this.ctx.rotate(platform.rotation);
+            }
             if (platform.type === 'ring') {
                 // Ring collision zones
-                const radius = (platform.width / 2) * projected.scale;
+                const radius = platform.width / 2;
                 // Outer boundary (collision zone)
                 this.ctx.strokeStyle = '#ff0000';
                 this.ctx.beginPath();
-                this.ctx.arc(projected.x, projected.y, radius + 30 * projected.scale, 0, Math.PI * 2);
+                this.ctx.arc(0, 0, radius + 30, 0, Math.PI * 2);
                 this.ctx.stroke();
                 // Inner boundary (safe zone)
                 this.ctx.strokeStyle = '#ffff00';
                 this.ctx.beginPath();
-                this.ctx.arc(projected.x, projected.y, radius - 30 * projected.scale, 0, Math.PI * 2);
+                this.ctx.arc(0, 0, radius - 30, 0, Math.PI * 2);
                 this.ctx.stroke();
                 // Center line
                 this.ctx.strokeStyle = '#00ffff';
                 this.ctx.lineWidth = 1;
                 this.ctx.beginPath();
-                this.ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+                this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
                 this.ctx.stroke();
             }
             else {
                 // Solid platform collision zones
-                const halfWidth = (platform.width / 2 + this.PLAYER_SIZE) * projected.scale;
-                const halfHeight = (platform.height / 2 + this.PLAYER_SIZE) * projected.scale;
+                const halfWidth = platform.width / 2 + this.PLAYER_SIZE;
+                const halfHeight = platform.height / 2 + this.PLAYER_SIZE;
                 this.ctx.strokeStyle = '#ff0000';
                 this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(projected.x - halfWidth, projected.y - halfHeight, halfWidth * 2, halfHeight * 2);
+                this.ctx.strokeRect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
             }
-            // Platform center dot and Z distance
+            this.ctx.restore();
+            // Platform center dot and Z distance (outside the transform)
             this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(projected.x - 2, projected.y - 2, 4, 4);
             this.ctx.fillText(`Z:${platform.z.toFixed(0)}`, projected.x + 10, projected.y);
         }
+        this.ctx.restore(); // Restore camera tilt transform
         // Draw coordinate axes from player center
         this.ctx.strokeStyle = '#ffffff';
         this.ctx.lineWidth = 1;
