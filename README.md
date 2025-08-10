@@ -19,6 +19,8 @@ Experience the thrill of freefall! You've just jumped from a hot air balloon at 
   - Wind effects that push you around
   - Increasing speed as you fall
   - Camera shake and tilt based on movement
+  - Precise 3D collision detection system
+- **Debug Mode**: Toggle detailed technical overlay showing collision zones, platform positions, and game state
 - **Atmospheric Progression**: Sky changes from blue to black as you fall from 10,000 feet to ground level
 - **High Score Tracking**: Beat your previous best falling distance
 
@@ -26,6 +28,7 @@ Experience the thrill of freefall! You've just jumped from a hot air balloon at 
 
 - **WASD**: Steer your freefall (A/D for left/right, W/S for up/down)
 - **SPACE**: Start your descent from the balloon / Restart after game over
+- **F**: Toggle debug mode (shows collision zones, platform data, and technical info)
 - **Click**: Focus the game window (if keys aren't responding)
 
 ## 🚀 Getting Started
@@ -87,8 +90,9 @@ npm run build
 - **Altitude System**: Start at 10,000ft, fall to 0ft
 - **Speed Progression**: Accelerate from 45mph to 225mph
 - **Wind Simulation**: Dynamic wind direction and strength
-- **Collision Detection**: Precise 3D collision for all platform types
+- **Collision Detection**: Precise 3D collision for all platform types with realistic timing
 - **Platform Generation**: Procedural obstacle placement with increasing complexity
+- **Debug System**: Technical overlay for development and gameplay analysis
 
 ## 📁 Project Structure
 
@@ -106,6 +110,18 @@ fastfall/
 ├── tsconfig.json
 └── README.md
 ```
+
+## 🔧 Recent Improvements (v1.3.0)
+
+- **Major Coordinate System Rework**: Complete redesign of 3D coordinate system for intuitive collision detection
+- **Enhanced Collision Timing**: Platforms now visually "hit the screen" when collisions occur, making gameplay feel much more natural
+- **Advanced Debug Mode**: Press `F` to toggle detailed technical overlay showing:
+  - Real-time collision zones with perfect alignment
+  - Platform positions and Z-distances
+  - Player movement data and active keys
+  - Game state information and version tracking
+- **Improved 3D Projection**: Simplified and more accurate depth perception with camera positioned at z=0
+- **Better Visual Feedback**: Platforms now scale and approach realistically, enhancing the falling sensation
 
 ## 🎯 Future Enhancements
 
