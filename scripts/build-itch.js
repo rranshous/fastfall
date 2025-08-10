@@ -38,7 +38,8 @@ const itchOptimizations = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="FastFall - High-speed first-person falling game. Navigate through platforms as you plummet from 10,000 feet!">
     <meta name="keywords" content="game, html5, falling, obstacle, arcade, first-person">
-    <meta name="author" content="FastFall Game">
+    <meta name="author" content="codeflaw">
+    <meta name="canonical" content="https://codeflaw.itch.io/fastfall">
     
     <!-- Itch.io optimizations -->
     <style>

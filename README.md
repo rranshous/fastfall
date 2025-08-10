@@ -2,6 +2,8 @@
 
 A high-speed first-person perspective falling game where you jump from a hot air balloon and navigate through increasingly complex platforms as you plummet toward the ground.
 
+**[🎮 Play FastFall on itch.io →](https://codeflaw.itch.io/fastfall)**
+
 ## 🎮 Game Concept
 
 Experience the thrill of freefall! You've just jumped from a hot air balloon at 10,000 feet and must navigate through stationary platforms, rings, and maze-like structures as you fall. The entire game takes place from a first-person POV - you ARE the falling skydiver.
@@ -143,7 +145,9 @@ fastfall/
 
 ## 📤 Publishing to Itch.io
 
-FastFall is ready for itch.io publishing! Use the dedicated build script:
+FastFall is live on itch.io! **[Play it here →](https://codeflaw.itch.io/fastfall)**
+
+The game includes a dedicated build script for easy publishing and updates:
 
 ```bash
 npm run build:itch
