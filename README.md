@@ -139,6 +139,30 @@ fastfall/
 - `npm run start` - Start Express server
 - `npm run serve` - Development server with auto-open
 - `npm run build` - Full production build
+- `npm run build:itch` - Build optimized package for itch.io publishing
+
+## 📤 Publishing to Itch.io
+
+FastFall is ready for itch.io publishing! Use the dedicated build script:
+
+```bash
+npm run build:itch
+```
+
+This creates:
+- **`dist/itch/`** - Optimized build directory with all game files
+- **`dist/fastfall-itch.zip`** - Ready-to-upload zip file for itch.io
+
+### Itch.io Upload Steps:
+1. Run `npm run build:itch` to create the distribution
+2. Go to [itch.io](https://itch.io) and create a new game page
+3. Upload `dist/fastfall-itch.zip` as your game file
+4. Set **"Kind of project"** to **"HTML"**
+5. Check **"This file will be played in the browser"**
+6. Set viewport dimensions (recommended: **1024x768** or **fullscreen**)
+7. Configure your game page and publish!
+
+The build includes itch.io optimizations for proper embedding and viewport handling.
 
 ## 📝 License
 
