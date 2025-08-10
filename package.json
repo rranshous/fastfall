@@ -4,10 +4,11 @@
   "description": "Fast-paced falling obstacle game",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/public/*.html dist/ && cp dist/game.js src/public/",
     "dev": "tsc --watch",
     "start": "node dist/server.js",
-    "serve": "http-server dist -p 3000 -o"
+    "serve": "http-server src/public -p 3000 -o",
+    "build:game": "tsc src/game.ts --outDir src/public --target ES2020 --lib ES2020,DOM --skipLibCheck"
   },
   "dependencies": {
     "express": "^4.18.2"
@@ -17,5 +18,11 @@
     "@types/node": "^20.5.0",
     "http-server": "^14.1.1",
     "typescript": "^5.1.6"
-  }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
