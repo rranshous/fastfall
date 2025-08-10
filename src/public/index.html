@@ -3,28 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FastFall</title>
+    <title>FastFall - Hot Air Balloon Escape</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
+            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 30%, #2F4F4F 60%, #000000 100%);
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
             color: white;
         }
         canvas {
-            border: 2px solid #333;
-            background-color: #111;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: none;
         }
         .ui {
             position: absolute;
             top: 20px;
             left: 20px;
-            font-size: 18px;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 3px solid #00ff00;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #00ff00;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: #00ff00;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff00;
         }
         .game-over {
             position: absolute;
@@ -32,26 +59,75 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #ff4444;
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.5);
             display: none;
+            z-index: 20;
+        }
+        .intro {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+            z-index: 20;
+        }
+        .intro h1 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .intro p {
+            font-size: 1.2em;
+            margin: 15px 0;
+        }
+        .wind-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
         }
     </style>
 </head>
 <body>
+    <div class="intro" id="intro">
+        <h1>🎈 FastFall 🎈</h1>
+        <p>You've jumped from a hot air balloon!</p>
+        <p>Navigate through platforms as you fall</p>
+        <p><strong>WASD</strong> - Steer your freefall</p>
+        <p><strong>SPACE</strong> - Start your descent</p>
+        <p><em>Click anywhere to focus, then press SPACE</em></p>
+    </div>
+
     <div class="ui">
-        <div>Distance: <span id="distance">0</span></div>
-        <div>High Score: <span id="highScore">0</span></div>
+        <div>Altitude: <span id="distance">10000</span>ft</div>
+        <div>Best Drop: <span id="highScore">0</span>ft</div>
+        <div>Speed: <span id="speed">0</span> mph</div>
     </div>
     
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="wind-indicator">
+        <div>Wind: <span id="windDirection">→</span> <span id="windSpeed">5</span> mph</div>
+    </div>
+
+    <div class="crosshair"></div>
+    
+    <canvas id="gameCanvas"></canvas>
     
     <div class="game-over" id="gameOver">
-        <h2>Game Over!</h2>
-        <p>Distance: <span id="finalDistance">0</span></p>
-        <p>High Score: <span id="finalHighScore">0</span></p>
-        <p>Press SPACE to restart</p>
+        <h2>💥 IMPACT! 💥</h2>
+        <p>You fell <span id="finalDistance">0</span> feet!</p>
+        <p>Best Drop: <span id="finalHighScore">0</span> feet</p>
+        <p>Press SPACE to jump again</p>
     </div>
     
     <script src="game.js"></script>

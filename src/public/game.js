@@ -1,244 +1,426 @@
-class Game {
+class FastFallGame {
     constructor(canvasId) {
         // Game constants
-        this.PLAYER_SIZE = 20;
-        this.PLAYER_SPEED = 5;
-        this.INITIAL_GAME_SPEED = 2;
-        this.OBSTACLE_GAP = 150;
-        this.MIN_OBSTACLE_GAP = 100;
+        this.PLAYER_SIZE = 15;
+        this.PLAYER_SPEED = 8;
+        this.INITIAL_GAME_SPEED = 3;
+        this.MAX_GAME_SPEED = 15;
+        this.PLATFORM_SPACING = 200;
+        this.FOV = 500; // Field of view for 3D projection
+        this.WIND_CHANGE_RATE = 0.002;
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-        // Player stays in center of screen for POV falling effect
-        this.player = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
-        this.obstacles = [];
+        // Make canvas full screen
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+        // Player position in 3D space (screen center for POV)
+        this.player = {
+            x: 0, // Relative to screen center
+            y: 0,
+            z: 0 // Z is our falling distance
+        };
+        this.platforms = [];
+        this.particles = [];
         this.gameSpeed = this.INITIAL_GAME_SPEED;
-        this.distance = 0;
+        this.altitude = 10000; // Start at 10,000 feet
         this.isGameOver = false;
+        this.gameStarted = false;
         this.keys = {};
         this.highScore = parseInt(localStorage.getItem('fastfall-highscore') || '0');
+        this.wind = { x: 0, strength: 5 };
+        this.camera = { shake: 0, tilt: 0 };
+        this.frameCount = 0;
         this.setupEventListeners();
-        this.generateInitialObstacles();
+        this.generatePlatforms();
         this.gameLoop();
         this.updateUI();
     }
+    resizeCanvas() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
     setupEventListeners() {
+        // Add click to focus
+        document.addEventListener('click', () => {
+            if (document.body) {
+                document.body.focus();
+            }
+        });
         document.addEventListener('keydown', (e) => {
             this.keys[e.key.toLowerCase()] = true;
-            // Restart game on space when game over
-            if (e.key === ' ' && this.isGameOver) {
-                this.restart();
+            // Start game or restart on space
+            if (e.key === ' ') {
+                e.preventDefault(); // Prevent page scroll
+                if (!this.gameStarted) {
+                    this.startGame();
+                }
+                else if (this.isGameOver) {
+                    this.restart();
+                }
             }
         });
         document.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
         });
     }
-    generateInitialObstacles() {
-        // Generate obstacles that start far below and move up toward player
-        // This creates the illusion of falling through them
-        for (let i = 0; i < 1000; i++) {
-            const y = i * this.OBSTACLE_GAP + this.canvas.height + 100; // Start below screen
-            // Create different patterns based on distance
-            const complexity = Math.floor(i / 20); // Increase complexity every 20 obstacles
-            if (complexity === 0) {
-                // Simple single obstacles
-                this.obstacles.push({
-                    x: (i % 3) * 250 + 100,
-                    y: y,
-                    width: 100,
-                    height: 30
-                });
+    startGame() {
+        this.gameStarted = true;
+        document.getElementById('intro').style.display = 'none';
+    }
+    generatePlatforms() {
+        // Generate platforms in 3D space that player must navigate around
+        this.platforms = [];
+        for (let i = 0; i < 500; i++) {
+            const z = i * this.PLATFORM_SPACING + 300; // Distance ahead of player
+            const complexity = Math.floor(i / 10) + 1; // Increase complexity over time
+            // Different platform types based on distance fallen
+            if (i < 5) {
+                // Easy start - simple single platforms
+                this.platforms.push(this.createPlatform((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 300, z, 150 + Math.random() * 100, 20 + Math.random() * 10, 30, 'solid', '#ff6b6b'));
             }
-            else if (complexity === 1) {
-                // Two obstacles with gap in middle for player to fall through
-                this.obstacles.push({
-                    x: 50,
-                    y: y,
-                    width: 150,
-                    height: 30
-                });
-                this.obstacles.push({
-                    x: 600,
-                    y: y,
-                    width: 150,
-                    height: 30
-                });
+            else if (i < 15) {
+                // Ring platforms to fly through
+                this.platforms.push(this.createRingPlatform((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200, z, 200 + Math.random() * 100, 30, '#4ecdc4'));
+            }
+            else if (i < 30) {
+                // Moving platforms
+                this.platforms.push(this.createMovingPlatform(0, 0, z, 120 + Math.random() * 80, 15 + Math.random() * 10, 25, '#45b7d1'));
             }
             else {
-                // More complex patterns
-                const pattern = i % 4;
-                switch (pattern) {
-                    case 0:
-                        // Three small obstacles with gaps
-                        for (let j = 0; j < 3; j++) {
-                            this.obstacles.push({
-                                x: j * 200 + 100 + (i % 2) * 50,
-                                y: y,
-                                width: 80,
-                                height: 30
-                            });
-                        }
-                        break;
-                    case 1:
-                        // Walls with narrow gaps to fall through
-                        this.obstacles.push({
-                            x: 0,
-                            y: y,
-                            width: 200,
-                            height: 30
-                        });
-                        this.obstacles.push({
-                            x: 350,
-                            y: y,
-                            width: 200,
-                            height: 30
-                        });
-                        this.obstacles.push({
-                            x: 600,
-                            y: y,
-                            width: 200,
-                            height: 30
-                        });
-                        break;
-                    default:
-                        // Random placement but deterministic
-                        const seed = i * 31 % 100;
-                        this.obstacles.push({
-                            x: (seed % 5) * 140 + 50,
-                            y: y,
-                            width: 120,
-                            height: 30
-                        });
+                // Complex maze-like structures
+                const mazeSize = 3 + Math.floor(complexity / 5);
+                this.createMazePlatforms(z, mazeSize);
+            }
+        }
+    }
+    createPlatform(x, y, z, width, height, depth, type, color) {
+        return {
+            x, y, z, width, height, depth, type, color,
+            rotation: 0
+        };
+    }
+    createRingPlatform(x, y, z, radius, thickness, color) {
+        return {
+            x, y, z,
+            width: radius * 2,
+            height: radius * 2,
+            depth: thickness,
+            type: 'ring',
+            color,
+            rotation: 0
+        };
+    }
+    createMovingPlatform(x, y, z, width, height, depth, color) {
+        return {
+            x, y, z, width, height, depth,
+            type: 'moving',
+            color,
+            rotation: 0,
+            movePattern: {
+                type: Math.random() > 0.5 ? 'horizontal' : 'circular',
+                speed: 0.02 + Math.random() * 0.03,
+                amplitude: 100 + Math.random() * 200,
+                phase: Math.random() * Math.PI * 2
+            }
+        };
+    }
+    createMazePlatforms(z, gridSize) {
+        const cellSize = 120;
+        const wallThickness = 20;
+        for (let i = 0; i < gridSize; i++) {
+            for (let j = 0; j < gridSize; j++) {
+                // Skip center for player path
+                if (i === Math.floor(gridSize / 2) && j === Math.floor(gridSize / 2))
+                    continue;
+                // Random maze generation - create some walls
+                if (Math.random() > 0.3) {
+                    this.platforms.push(this.createPlatform((i - gridSize / 2) * cellSize, (j - gridSize / 2) * cellSize, z, cellSize - 10, wallThickness, cellSize - 10, 'maze', '#ff9f43'));
                 }
             }
         }
     }
     updatePlayer() {
-        if (this.isGameOver)
+        if (this.isGameOver || !this.gameStarted)
             return;
-        // Handle WASD movement - player moves within their freefall
-        // A/D for main horizontal steering during freefall
-        if (this.keys['a'] && this.player.x > 10) {
-            this.player.x -= this.PLAYER_SPEED;
+        // Handle WASD movement in 3D space
+        const moveSpeed = this.PLAYER_SPEED;
+        // A/D for horizontal steering (left/right)
+        if (this.keys['a']) {
+            this.player.x -= moveSpeed;
         }
-        if (this.keys['d'] && this.player.x < this.canvas.width - this.PLAYER_SIZE - 10) {
-            this.player.x += this.PLAYER_SPEED;
+        if (this.keys['d']) {
+            this.player.x += moveSpeed;
         }
-        // W/S for subtle vertical adjustment within the falling motion
-        // More like leaning forward/back in freefall
-        if (this.keys['w'] && this.player.y > this.canvas.height * 0.3) {
-            this.player.y -= this.PLAYER_SPEED * 0.3;
+        // W/S for vertical steering (up/down)
+        if (this.keys['w']) {
+            this.player.y -= moveSpeed * 0.7; // Slightly slower vertical movement
         }
-        if (this.keys['s'] && this.player.y < this.canvas.height * 0.7) {
-            this.player.y += this.PLAYER_SPEED * 0.3;
+        if (this.keys['s']) {
+            this.player.y += moveSpeed * 0.7;
         }
+        // Apply wind effect
+        this.player.x += this.wind.x * this.wind.strength * 0.1;
+        // Limit player movement to reasonable bounds
+        const maxOffset = 300;
+        this.player.x = Math.max(-maxOffset, Math.min(maxOffset, this.player.x));
+        this.player.y = Math.max(-maxOffset, Math.min(maxOffset, this.player.y));
+        // Update camera shake based on speed
+        this.camera.shake = this.gameSpeed * 0.5;
+        this.camera.tilt = this.player.x * 0.001; // Tilt based on horizontal movement
     }
-    updateObstacles() {
-        if (this.isGameOver)
+    updatePlatforms() {
+        if (this.isGameOver || !this.gameStarted)
             return;
-        // Move obstacles UP toward the player (creating POV falling effect)
-        this.obstacles.forEach(obstacle => {
-            obstacle.y -= this.gameSpeed;
+        // Move platforms toward player (simulating falling)
+        this.platforms.forEach(platform => {
+            platform.z -= this.gameSpeed;
+            // Update moving platforms
+            if (platform.type === 'moving' && platform.movePattern) {
+                const pattern = platform.movePattern;
+                const time = this.frameCount * pattern.speed + pattern.phase;
+                switch (pattern.type) {
+                    case 'horizontal':
+                        platform.x += Math.sin(time) * pattern.amplitude * 0.01;
+                        break;
+                    case 'vertical':
+                        platform.y += Math.sin(time) * pattern.amplitude * 0.01;
+                        break;
+                    case 'circular':
+                        platform.x += Math.sin(time) * pattern.amplitude * 0.01;
+                        platform.y += Math.cos(time) * pattern.amplitude * 0.01;
+                        break;
+                }
+            }
+            // Rotate some platforms for visual effect
+            if (platform.type !== 'solid') {
+                platform.rotation += 0.01;
+            }
         });
-        // Remove obstacles that have passed above the screen
-        this.obstacles = this.obstacles.filter(obstacle => obstacle.y > -obstacle.height - 100);
-        // Update distance and speed
-        this.distance += this.gameSpeed;
-        this.gameSpeed = this.INITIAL_GAME_SPEED + Math.floor(this.distance / 1000) * 0.5;
+        // Remove platforms that have passed behind the player
+        this.platforms = this.platforms.filter(platform => platform.z > -200);
+        // Update game state
+        this.altitude -= this.gameSpeed * 10; // Each unit of speed = 10 feet
+        this.gameSpeed = Math.min(this.MAX_GAME_SPEED, this.INITIAL_GAME_SPEED + Math.floor((10000 - this.altitude) / 1000));
+        // Update wind
+        this.wind.x += (Math.random() - 0.5) * this.WIND_CHANGE_RATE;
+        this.wind.x = Math.max(-1, Math.min(1, this.wind.x));
+        this.wind.strength = 3 + Math.sin(this.frameCount * 0.01) * 2;
+    }
+    updateParticles() {
+        // Add wind/speed particles
+        if (this.gameStarted && !this.isGameOver && Math.random() < 0.3) {
+            this.particles.push({
+                x: (Math.random() - 0.5) * this.canvas.width,
+                y: (Math.random() - 0.5) * this.canvas.height,
+                z: 1000 + Math.random() * 500,
+                vx: this.wind.x * 2,
+                vy: 0,
+                vz: -this.gameSpeed * 2,
+                life: 60,
+                maxLife: 60,
+                size: 1 + Math.random() * 3,
+                color: '#ffffff'
+            });
+        }
+        // Update existing particles
+        this.particles.forEach(particle => {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.z += particle.vz;
+            particle.life--;
+        });
+        // Remove dead particles
+        this.particles = this.particles.filter(particle => particle.life > 0 && particle.z > -100);
     }
     checkCollisions() {
-        if (this.isGameOver)
+        if (this.isGameOver || !this.gameStarted)
             return;
-        for (const obstacle of this.obstacles) {
-            if (this.player.x < obstacle.x + obstacle.width &&
-                this.player.x + this.PLAYER_SIZE > obstacle.x &&
-                this.player.y < obstacle.y + obstacle.height &&
-                this.player.y + this.PLAYER_SIZE > obstacle.y) {
-                this.gameOver();
-                break;
+        for (const platform of this.platforms) {
+            // Only check platforms that are close to the player
+            if (platform.z > -50 && platform.z < 50) {
+                const distanceX = Math.abs(this.player.x - platform.x);
+                const distanceY = Math.abs(this.player.y - platform.y);
+                if (platform.type === 'ring') {
+                    // Ring collision - check if player is outside the ring
+                    const radius = platform.width / 2;
+                    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+                    if (distance > radius - 30 && distance < radius + 30) {
+                        // Player is in the ring wall - collision!
+                        this.gameOver();
+                        return;
+                    }
+                }
+                else {
+                    // Solid platform collision
+                    if (distanceX < platform.width / 2 + this.PLAYER_SIZE &&
+                        distanceY < platform.height / 2 + this.PLAYER_SIZE) {
+                        this.gameOver();
+                        return;
+                    }
+                }
             }
         }
     }
     gameOver() {
         this.isGameOver = true;
+        // Calculate final distance
+        const distanceFallen = 10000 - this.altitude;
         // Update high score
-        if (this.distance > this.highScore) {
-            this.highScore = this.distance;
+        if (distanceFallen > this.highScore) {
+            this.highScore = distanceFallen;
             localStorage.setItem('fastfall-highscore', this.highScore.toString());
         }
         // Show game over screen
         const gameOverDiv = document.getElementById('gameOver');
         const finalDistance = document.getElementById('finalDistance');
         const finalHighScore = document.getElementById('finalHighScore');
-        finalDistance.textContent = Math.floor(this.distance).toString();
+        finalDistance.textContent = Math.floor(distanceFallen).toString();
         finalHighScore.textContent = Math.floor(this.highScore).toString();
         gameOverDiv.style.display = 'block';
     }
     restart() {
-        // Reset player to center for POV falling
-        this.player = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
+        // Reset player to center
+        this.player = { x: 0, y: 0, z: 0 };
         this.gameSpeed = this.INITIAL_GAME_SPEED;
-        this.distance = 0;
+        this.altitude = 10000;
         this.isGameOver = false;
+        this.gameStarted = true;
         this.keys = {};
-        // Reset obstacles to initial state
-        this.obstacles = [];
-        this.generateInitialObstacles();
+        this.wind = { x: 0, strength: 5 };
+        this.camera = { shake: 0, tilt: 0 };
+        this.frameCount = 0;
+        // Reset platforms
+        this.platforms = [];
+        this.particles = [];
+        this.generatePlatforms();
         // Hide game over screen
         document.getElementById('gameOver').style.display = 'none';
         this.updateUI();
     }
+    project3D(x, y, z) {
+        // Simple 3D to 2D projection
+        const scale = this.FOV / (this.FOV + z);
+        return {
+            x: this.canvas.width / 2 + (x + this.camera.shake * (Math.random() - 0.5)) * scale,
+            y: this.canvas.height / 2 + (y + this.camera.shake * (Math.random() - 0.5)) * scale,
+            scale
+        };
+    }
     render() {
-        // Clear canvas with gradient background to enhance depth
+        // Clear canvas with sky gradient
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        gradient.addColorStop(0, '#0a0a0a'); // Darker at top (distance)
-        gradient.addColorStop(1, '#222'); // Lighter at bottom (closer)
+        const altitudeRatio = Math.max(0, this.altitude / 10000);
+        // Color changes as you fall
+        if (altitudeRatio > 0.7) {
+            gradient.addColorStop(0, '#87CEEB'); // Sky blue
+            gradient.addColorStop(1, '#4682B4'); // Steel blue
+        }
+        else if (altitudeRatio > 0.3) {
+            gradient.addColorStop(0, '#4682B4'); // Steel blue
+            gradient.addColorStop(1, '#2F4F4F'); // Dark slate gray
+        }
+        else {
+            gradient.addColorStop(0, '#2F4F4F'); // Dark slate gray
+            gradient.addColorStop(1, '#000000'); // Black
+        }
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        // Draw speed lines to enhance falling effect
-        this.drawSpeedLines();
-        // Draw obstacles with perspective scaling
-        this.ctx.fillStyle = '#ff4444';
-        this.obstacles.forEach(obstacle => {
-            if (obstacle.y > -obstacle.height && obstacle.y < this.canvas.height) {
-                // Calculate distance from player for perspective effect
-                const distanceFromPlayer = Math.abs(obstacle.y - this.player.y);
-                const maxDistance = this.canvas.height;
-                const scale = Math.max(0.3, 1 - (distanceFromPlayer / maxDistance) * 0.7);
-                // Scale obstacle based on distance (closer = bigger)
-                const scaledWidth = obstacle.width * scale;
-                const scaledHeight = obstacle.height * scale;
-                const scaledX = obstacle.x + (obstacle.width - scaledWidth) / 2;
-                this.ctx.fillRect(scaledX, obstacle.y, scaledWidth, scaledHeight);
+        // Apply camera tilt
+        this.ctx.save();
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.rotate(this.camera.tilt);
+        this.ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
+        // Draw particles (wind/speed effects)
+        this.drawParticles();
+        // Draw platforms in distance order (far to near)
+        const sortedPlatforms = [...this.platforms].sort((a, b) => b.z - a.z);
+        for (const platform of sortedPlatforms) {
+            if (platform.z > -100 && platform.z < 2000) {
+                this.drawPlatform(platform);
             }
-        });
-        // Draw player with slight glow effect
-        this.ctx.fillStyle = '#44ff44';
-        this.ctx.shadowColor = '#44ff44';
-        this.ctx.shadowBlur = 10;
-        this.ctx.fillRect(this.player.x, this.player.y, this.PLAYER_SIZE, this.PLAYER_SIZE);
-        this.ctx.shadowBlur = 0; // Reset shadow
+        }
+        this.ctx.restore();
+        // Draw crosshair (player indicator) - always in center
+        this.drawCrosshair();
     }
-    drawSpeedLines() {
-        this.ctx.strokeStyle = '#333';
-        this.ctx.lineWidth = 1;
-        // Draw vertical speed lines to simulate falling motion
-        for (let i = 0; i < 20; i++) {
-            const x = (i / 20) * this.canvas.width;
-            const offset = (this.distance * this.gameSpeed * 2) % 50;
+    drawPlatform(platform) {
+        const projected = this.project3D(platform.x, platform.y, platform.z);
+        if (projected.scale <= 0)
+            return; // Behind camera
+        this.ctx.save();
+        this.ctx.translate(projected.x, projected.y);
+        this.ctx.scale(projected.scale, projected.scale);
+        // Apply rotation
+        if (platform.rotation !== 0) {
+            this.ctx.rotate(platform.rotation);
+        }
+        // Set style based on distance
+        const alpha = Math.min(1, Math.max(0.1, projected.scale));
+        this.ctx.fillStyle = platform.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        this.ctx.strokeStyle = '#ffffff' + Math.floor(alpha * 128).toString(16).padStart(2, '0');
+        this.ctx.lineWidth = 2;
+        if (platform.type === 'ring') {
+            // Draw ring
+            const radius = platform.width / 2;
             this.ctx.beginPath();
-            this.ctx.moveTo(x, -offset);
-            this.ctx.lineTo(x, this.canvas.height - offset);
+            this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            this.ctx.arc(0, 0, radius - platform.depth, 0, Math.PI * 2, true);
+            this.ctx.fill();
+            this.ctx.stroke();
+        }
+        else {
+            // Draw solid rectangle
+            this.ctx.fillRect(-platform.width / 2, -platform.height / 2, platform.width, platform.height);
+            this.ctx.strokeRect(-platform.width / 2, -platform.height / 2, platform.width, platform.height);
+        }
+        this.ctx.restore();
+    }
+    drawParticles() {
+        this.ctx.save();
+        for (const particle of this.particles) {
+            const projected = this.project3D(particle.x, particle.y, particle.z);
+            if (projected.scale > 0) {
+                const alpha = (particle.life / particle.maxLife) * projected.scale;
+                this.ctx.fillStyle = particle.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+                const size = particle.size * projected.scale;
+                this.ctx.fillRect(projected.x - size / 2, projected.y - size / 2, size, size);
+            }
+        }
+        this.ctx.restore();
+    }
+    drawCrosshair() {
+        // The crosshair is handled by CSS, but we can add additional effects here
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        // Draw speed indicator lines
+        this.ctx.strokeStyle = `rgba(0, 255, 0, ${0.3 + this.gameSpeed / this.MAX_GAME_SPEED * 0.7})`;
+        this.ctx.lineWidth = 2;
+        const speedLines = 8;
+        for (let i = 0; i < speedLines; i++) {
+            const angle = (i / speedLines) * Math.PI * 2;
+            const length = 40 + this.gameSpeed * 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX + Math.cos(angle) * 25, centerY + Math.sin(angle) * 25);
+            this.ctx.lineTo(centerX + Math.cos(angle) * length, centerY + Math.sin(angle) * length);
             this.ctx.stroke();
         }
     }
     updateUI() {
-        document.getElementById('distance').textContent = Math.floor(this.distance).toString();
+        const distanceFallen = 10000 - this.altitude;
+        const speedMph = Math.floor(this.gameSpeed * 15); // Convert to mph
+        document.getElementById('distance').textContent = Math.floor(this.altitude).toString();
         document.getElementById('highScore').textContent = Math.floor(this.highScore).toString();
+        document.getElementById('speed').textContent = speedMph.toString();
+        // Update wind indicator
+        const windDirection = this.wind.x > 0 ? '→' : this.wind.x < 0 ? '←' : '↓';
+        document.getElementById('windDirection').textContent = windDirection;
+        document.getElementById('windSpeed').textContent = Math.floor(Math.abs(this.wind.strength)).toString();
     }
     gameLoop() {
+        this.frameCount++;
         this.updatePlayer();
-        this.updateObstacles();
+        this.updatePlatforms();
+        this.updateParticles();
         this.checkCollisions();
         this.render();
         this.updateUI();
@@ -247,5 +429,5 @@ class Game {
 }
 // Start the game when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new Game('gameCanvas');
+    new FastFallGame('gameCanvas');
 });
