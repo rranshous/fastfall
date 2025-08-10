@@ -50,6 +50,7 @@ class FastFallGame {
   private wind: { x: number; strength: number };
   private camera: { shake: number; tilt: number };
   private frameCount: number;
+  private debugMode: boolean; // Add debug mode toggle
   
   // Game constants
   private readonly PLAYER_SIZE = 15;
@@ -86,6 +87,7 @@ class FastFallGame {
     this.wind = { x: 0, strength: 5 };
     this.camera = { shake: 0, tilt: 0 };
     this.frameCount = 0;
+    this.debugMode = false; // Initialize debug mode
     
     this.setupEventListeners();
     this.generatePlatforms();
@@ -117,6 +119,12 @@ class FastFallGame {
         } else if (this.isGameOver) {
           this.restart();
         }
+      }
+      
+      // Toggle debug mode with 'F' key
+      if (e.key.toLowerCase() === 'f') {
+        this.debugMode = !this.debugMode;
+        console.log('Debug mode:', this.debugMode ? 'ON' : 'OFF');
       }
     });
     
@@ -475,6 +483,11 @@ class FastFallGame {
     
     // Draw crosshair (player indicator) - always in center
     this.drawCrosshair();
+    
+    // Draw debug information if debug mode is enabled
+    if (this.debugMode) {
+      this.drawDebugInfo();
+    }
   }
   
   private drawPlatform(platform: Platform): void {
@@ -557,6 +570,120 @@ class FastFallGame {
       );
       this.ctx.stroke();
     }
+  }
+  
+  private drawDebugInfo(): void {
+    // Reset any transforms for debug overlay
+    this.ctx.save();
+    this.ctx.resetTransform();
+    
+    // Semi-transparent background for debug text
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 10, 350, 200);
+    
+    // Debug text styling
+    this.ctx.fillStyle = '#00ff00';
+    this.ctx.font = '14px monospace';
+    
+    // Player position and debug info
+    let y = 30;
+    const lineHeight = 16;
+    
+    this.ctx.fillText(`Debug Mode (F to toggle)`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Player X: ${this.player.x.toFixed(1)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Player Y: ${this.player.y.toFixed(1)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Player Z: ${this.player.z.toFixed(1)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Game Speed: ${this.gameSpeed.toFixed(1)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Altitude: ${this.altitude.toFixed(0)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Wind X: ${this.wind.x.toFixed(2)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Wind Strength: ${this.wind.strength.toFixed(1)}`, 20, y); y += lineHeight;
+    this.ctx.fillText(`Platforms: ${this.platforms.length}`, 20, y); y += lineHeight;
+    
+    // Show nearby platforms
+    const nearbyPlatforms = this.platforms.filter(p => p.z > -50 && p.z < 200);
+    this.ctx.fillText(`Nearby Platforms: ${nearbyPlatforms.length}`, 20, y); y += lineHeight;
+    
+    // Draw player collision boundary in center of screen
+    this.ctx.strokeStyle = '#00ff00';
+    this.ctx.lineWidth = 2;
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+    
+    // Player collision circle
+    this.ctx.beginPath();
+    this.ctx.arc(centerX, centerY, this.PLAYER_SIZE, 0, Math.PI * 2);
+    this.ctx.stroke();
+    
+    // Draw collision zones for nearby platforms
+    this.ctx.strokeStyle = '#ff0000';
+    this.ctx.lineWidth = 1;
+    
+    for (const platform of nearbyPlatforms) {
+      const projected = this.project3D(platform.x, platform.y, platform.z);
+      
+      if (platform.type === 'ring') {
+        // Ring collision zones
+        const radius = (platform.width / 2) * projected.scale;
+        
+        // Outer boundary (collision zone)
+        this.ctx.strokeStyle = '#ff0000';
+        this.ctx.beginPath();
+        this.ctx.arc(projected.x, projected.y, radius + 30 * projected.scale, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        // Inner boundary (safe zone)
+        this.ctx.strokeStyle = '#ffff00';
+        this.ctx.beginPath();
+        this.ctx.arc(projected.x, projected.y, radius - 30 * projected.scale, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        // Center line
+        this.ctx.strokeStyle = '#00ffff';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+      } else {
+        // Solid platform collision zones
+        const halfWidth = (platform.width / 2 + this.PLAYER_SIZE) * projected.scale;
+        const halfHeight = (platform.height / 2 + this.PLAYER_SIZE) * projected.scale;
+        
+        this.ctx.strokeStyle = '#ff0000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(
+          projected.x - halfWidth,
+          projected.y - halfHeight,
+          halfWidth * 2,
+          halfHeight * 2
+        );
+      }
+      
+      // Platform center dot and Z distance
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillRect(projected.x - 2, projected.y - 2, 4, 4);
+      this.ctx.fillText(`Z:${platform.z.toFixed(0)}`, projected.x + 10, projected.y);
+    }
+    
+    // Draw coordinate axes from player center
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = 1;
+    this.ctx.setLineDash([5, 5]);
+    
+    // X axis (horizontal)
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, centerY);
+    this.ctx.lineTo(this.canvas.width, centerY);
+    this.ctx.stroke();
+    
+    // Y axis (vertical)
+    this.ctx.beginPath();
+    this.ctx.moveTo(centerX, 0);
+    this.ctx.lineTo(centerX, this.canvas.height);
+    this.ctx.stroke();
+    
+    this.ctx.setLineDash([]);
+    this.ctx.restore();
   }
   
   private updateUI(): void {
